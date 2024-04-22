@@ -95,6 +95,137 @@ func main() {
 - `lexerPointer` holds the memory address of the `Lexer` instance.
 - `actualLexer` holds the actual `Lexer` object by dereferencing `lexerPointer`.
 
-### Questions
-What's the significance of defining a separate type of `TokenType` instead of just using a `string` in the `Token` definition?
-- I suppose that it allows us to only specify certains strings that qualify?
+(2024-04-22 18:11)
+We create the `readChar()` method to help the lexer read the `ch` character in `position`
+
+(link to image - pg 14)
+
+After adding helper methods to read through the characters of the source code, we need to convert them into tokens:
+
+```go
+func (l *Lexer) NextToken() token.Token {
+	var tok token.Token
+
+	switch l.ch {
+	case '=':
+		tok = newToken(token.ASSIGN, l.ch)
+	case ';':
+		tok = newToken(token.SEMICOLON, l.ch)
+	case '(':
+		tok = newToken(token.LPAREN, l.ch)
+	case ')':
+		tok = newToken(token.RPAREN, l.ch)
+	case ',':
+		tok = newToken(token.COMMA, l.ch)
+	case '+':
+		tok = newToken(token.PLUS, l.ch)
+	case '{':
+		tok = newToken(token.LBRACE, l.ch)
+	case '}':
+		tok = newToken(token.RBRACE, l.ch)
+	case 0:
+		tok.Literal = ""
+		tok.Type = token.EOF
+	}
+
+	l.readChar()
+	return tok
+}
+
+func newToken(tokenType token.TokenType, ch byte) token.Token {
+	return token.Token{Type: tokenType, Literal: string(ch)}
+}
+
+```
+
+All we're doing here is reading through the source code and returning the appropriate `token.Token` according to what we've defined in the `token.go` file.
+
+Returning to the test, we change the input to a block of legitimate-looking source code.
+
+> [!NOTE] Note on [[Testing]]
+> We're looking to test the behaviour of the code - here we're moving between testing and implementation, and using each to drive the other. 
+>
+> This change breaks on **identifiers**, **keywords** and **numbers**.
+>
+> After the first set of identifiers were implemented, we change the input to something more closely resembling the `monkey` language in its final form - we'll use these test to determine if our implementation is [[On Spec]] (*see: [[Design by Contract]]*).
+
+We need to change the `Lexer` so that it can recognise the new identifiers, keywords and numbers that we're passing into it.
+
+```go
+func (l *Lexer) NextToken() token.Token {
+    var tok token.Token
+
+    switch l.ch {
+    case '=':
+	tok = newToken(token.ASSIGN, l.ch)
+    case ';':
+	tok = newToken(token.SEMICOLON, l.ch)
+    case '(':
+	tok = newToken(token.LPAREN, l.ch)
+    case ')':
+	tok = newToken(token.RPAREN, l.ch)
+    case ',':
+	tok = newToken(token.COMMA, l.ch)
+    case '+':
+	tok = newToken(token.PLUS, l.ch)
+    case '{':
+	tok = newToken(token.LBRACE, l.ch)
+    case '}':
+	tok = newToken(token.RBRACE, l.ch)
+    case 0:
+	tok.Literal = ""
+	tok.Type = token.EOF
+    default:
+	if isLetter(l.ch) {
+		tok.Literal = l.readIdentifier()
+		return tok
+	} else {
+		tok = newToken(token.ILLEGAL, l.ch)
+	}
+    }
+
+    l.readChar()
+    return tok
+}
+
+func (l *Lexer) readIdentifier() string {
+    position := l.position
+
+    for isLetter(l.ch) {
+	l.readChar()
+    }
+
+    return l.input[position:l.position]
+}
+
+func isLetter(ch byte) bool {
+    return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_'
+}
+```
+
+Add code to handle identifiers in the source code; if the current `input` is a character, but isn't a recognised token, then we read the text with `readIdentifier()`, and when it's completed we return the identifier in an array.
+
+To account for this we need to a way to differentiate between identifiers and protected keywords; we add this to `Token`, as in future we might decide to add more primitive tokens to the language:
+
+```go
+var keywords = map[string]TokenType{
+    "fn":  FUNCTION,
+    "let": LET,
+}
+
+func LookupIdent(ident string) TokenType {
+    // passing the `ident` string into the table, we'll return anything that
+    // successfully return from out of it 
+    if tok, ok := keywords[ident]; ok {
+	return tok
+    }
+
+    // ...otherwise we return the IDENT constant
+    return IDENT
+}
+```
+
+> [!NOTE]- On code snippets
+> I don't think it's really so productive to copy and paste everything that I'm adding to source code in here, so I'll try to stop adding things which aren't so special from here on out. ==The concepts from page-to-page aren't difficult, but the end-result is complex, so it's difficult to appreciate what deserves noting down.==
+
+Continuing on, I added methods to skip whitespace and parse the remaining tokens in the source input.
