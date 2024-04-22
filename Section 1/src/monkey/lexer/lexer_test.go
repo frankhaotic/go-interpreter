@@ -38,3 +38,4 @@ func TestNextToken(t *testing.T) {
 		}
 	}
 }
+
