@@ -229,3 +229,53 @@ func LookupIdent(ident string) TokenType {
 > I don't think it's really so productive to copy and paste everything that I'm adding to source code in here, so I'll try to stop adding things which aren't so special from here on out. ==The concepts from page-to-page aren't difficult, but the end-result is complex, so it's difficult to appreciate what deserves noting down.==
 
 Continuing on, I added methods to skip whitespace and parse the remaining tokens in the source input.
+
+(2024-04-23 13:47) - starting section 1.4
+
+This section focusses on extending the token set and lexer functionality. We'll add support for the following operators: ==, !, !=, -, /, \*, \<, \>, and keywords: `true`, `false`, `if`, `else`, and `return`.
+
+Starting with the operators, we add these new tokens to the token.go file, and update the lexer to recognise these new types. Update the tests to account for these too.
+
+Adding the remaining keywords is also made simple by the existing `keywords` table and parsing methods on the lexer.
+
+We now need to account for tokens composed of multiple characters - `==` and `!-`. To build this out we introduce the `peekChar()` method, which will allow us to peek ahead at upcoming char values from the input - similar to the `readChar()` method, but without incrementing `l.position` and `l.readPosition`.
+
+> [!NOTE]- Lexer standards on peeking
+> Most languages implementing peeking, but languages differ by the amount of peeking necessary to correctly tokenise the input.
+
+Currently the lexer recognises `==` as 2 separate `ASSIGN` tokens, so using `peekChar()` we look ahead to see what the next character is:
+
+```go
+func (l *Lexer) peekChar() byte {
+    if l.readPosition >= len(l.input) {
+	return 0
+    } else {
+	return l.input[l.readPosition]
+    }
+}
+
+// [...]
+case '=':
+    if l.peekChar() == '=' {
+	ch := l.ch
+	l.readChar()
+	literal := string(ch) + string(l.ch)
+	tok = token.Token{Type: token.EQ, Literal: literal}
+    } else {
+	tok = newToken(token.ASSIGN, l.ch)
+    }
+// [...]
+case '!':
+    if l.peekChar() == '=' {
+	ch := l.ch
+	l.readChar()
+	literal := string(ch) + string(l.ch)
+	tok = token.Token{Type: token.NOT_EQ, Literal: literal}
+    } else {
+	tok = newToken(token.BANG, l.ch)
+    }
+// [...]
+```
+
+We assign the current character to `ch` and read the next character, advancing the position for the next case of the lexer.
+
