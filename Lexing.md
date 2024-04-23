@@ -230,7 +230,8 @@ func LookupIdent(ident string) TokenType {
 
 Continuing on, I added methods to skip whitespace and parse the remaining tokens in the source input.
 
-(2024-04-23 13:47) - starting section 1.4
+(2024-04-23 13:47)
+#### Extending our token set and Lexer
 
 This section focusses on extending the token set and lexer functionality. We'll add support for the following operators: ==, !, !=, -, /, \*, \<, \>, and keywords: `true`, `false`, `if`, `else`, and `return`.
 
@@ -278,4 +279,105 @@ case '!':
 ```
 
 We assign the current character to `ch` and read the next character, advancing the position for the next case of the lexer.
+
+#### Start of a REPL
+To start building with the language we first need to create the [[REPL]] - Read, Eval, Print, Loop.
+
+We're not yet at the point we can evaluate the source code - we've only begun tokenising the input.
+
+We add in the `repl.go` to allow for this behaviour:
+
+```go
+// repl.repl.go
+
+package repl
+
+import (
+	"bufio"
+	"fmt"
+	"io"
+	"monkey/lexer"
+	"monkey/token"
+)
+
+const PROMPT = ">> "
+
+func Start(in io.Reader, out io.Writer) {
+	scanner := bufio.NewScanner(in)
+
+	for {
+		fmt.Fprintf(out, PROMPT)
+		scanned := scanner.Scan()
+		if !scanned {
+			return
+		}
+
+		line := scanner.Text()
+		l := lexer.New(line)
+
+		for tok := l.NextToken(); tok.Type != token.EOF; tok = l.NextToken() {
+			fmt.Fprintf(out, "%+v\n", tok)
+		}
+	}
+}
+```
+
+- Establish a scanner to read input
+- Open a while loop, and for each line entered into the REPL
+    - Print the PROMPT string
+    - Try to scan the input; return from the repl if it doesn't scan
+    - Get the line entered into the repl and lex it
+    - For each valid `monkey` token entered into the repl, output that token
+
+But we still need somewhere to call this from - the `main.go` file for the project.
+
+```go
+// main.go
+
+package main
+
+import (
+    "fmt"
+    "monkey/repl"
+    "os"
+    "os/user"
+)
+
+func main() {
+    user, err := user.Current()
+    if err != nil {
+	panic(err)
+    }
+
+    fmt.Printf("Hello %s! This is the Monkey programming language!\n", user.Username)
+    fmt.Printf("Feel free to type in commands\n")
+    repl.Start(os.Stdin, os.Stdout)
+}
+```
+
+Run the repl with `go run main.go` and pass in some of the `monkey` syntax that we've established:
+
+```sh
+$ go run main.go Hello mrnugget! This is the Monkey programming language!
+
+Feel free to type in commands
+>> let add = fn(x, y) { x + y; }; 
+{Type:LET Literal:let}
+{Type:IDENT Literal:add}
+{Type:= Literal:=}
+{Type:FUNCTION Literal:fn}
+{Type:( Literal:(}
+{Type:IDENT Literal:x}
+{Type:, Literal:,}
+{Type:IDENT Literal:y}
+{Type:) Literal:)}
+{Type:\{ Literal:{\}
+{Type:IDENT Literal:x}
+{Type:+ Literal:+}
+{Type:IDENT Literal:y}
+{Type:; Literal:;}
+{Type:} Literal:}}
+{Type:; Literal:;}
+>>
+```
 
